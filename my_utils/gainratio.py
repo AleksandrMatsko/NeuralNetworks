@@ -2,15 +2,16 @@ import pandas as pd
 import math
 
 
-def info(df: pd.DataFrame, target_name: str) -> float:
+def info(df: pd.DataFrame, sub_df: pd.DataFrame, target_name: str) -> float:
     if df[target_name].nunique() == 0:
         return 0
     interval_count = 1 + int(math.log(df[target_name].nunique(), 2))
     left_border = df[target_name].min()
     right_border = df[target_name].max()
     step = (right_border - left_border) / interval_count
+
     vals_in_interval = [0] * interval_count
-    value_counts = df[target_name].value_counts()
+    value_counts = sub_df[target_name].value_counts()
     unq_vals = list(value_counts.index)
     if step != 0:
         for i in range(len(unq_vals)):
@@ -21,7 +22,7 @@ def info(df: pd.DataFrame, target_name: str) -> float:
 
     s = 0.0
     for val in value_counts:
-        tmp = val / df[target_name].count()
+        tmp = val / sub_df[target_name].count()
         if tmp != 0:
             s += tmp * math.log(tmp, 2)
     return -s
@@ -42,7 +43,7 @@ def info_a(df: pd.DataFrame, attr_name: str, target_name: str) -> float:
     for border in left_borders:
         sub_df = df.loc[((df[attr_name] >= border) & (df[attr_name] < border + step)) |
                         (df[attr_name] == right_border)]
-        s += info(sub_df, target_name)
+        s += info(df, sub_df, target_name)
     return s
 
 
@@ -55,7 +56,7 @@ def split_info(df: pd.DataFrame, attr_name: str) -> float:
 
 
 def gain(df: pd.DataFrame, attr_name: str, target_name: str) -> float:
-    return info(df, target_name) - info_a(df, attr_name, target_name)
+    return info(df, df, target_name) - info_a(df, attr_name, target_name)
 
 
 def gain_ratio(df: pd.DataFrame, attr_name: str, target_name: str) -> float:
