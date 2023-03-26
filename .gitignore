@@ -2,3 +2,4 @@
 my_utils/__pycache__/
 */.idea
 */venv
+*/__pycache__/
