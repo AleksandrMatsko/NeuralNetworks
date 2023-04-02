@@ -24,3 +24,11 @@ def derivative(f, x: float, h: float):
         Approximates the first derivative with O(h^2)
     """
     return (f(x + h) - f(x - h)) / (2 * h)
+
+
+FUNC_DICT = {
+    "ReLu": relu,
+    "tanh": tanh,
+    "me": me,
+    "sigmoid": sigmoid
+}
