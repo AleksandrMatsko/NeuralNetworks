@@ -1,6 +1,6 @@
 import pandas as pd
 import math
-
+import typing
 
 def info(df: pd.DataFrame, sub_df: pd.DataFrame, target_name: str) -> float:
     if df[target_name].nunique() == 0:
@@ -55,16 +55,36 @@ def split_info(df: pd.DataFrame, attr_name: str) -> float:
     return s
 
 
-def gain(df: pd.DataFrame, attr_name: str, target_name: str) -> float:
+def categorial_info(df: pd.DataFrame, target_name: str) -> float:
+    res = 0
+    for val in df[target_name].value_counts():
+        tmp = val / df[target_name].count()
+        if (tmp != 0):
+            res += tmp * math.log(tmp, 2)
+    return -res
+
+def categorial_info_a(df: pd.DataFrame, attr_name: str, target_name: str) -> float:
+    res = 0
+    for un_val in df[attr_name].unique():
+        sub_df = df.loc[df[attr_name] == un_val]
+        res += categorial_info(sub_df, target_name)
+    return res
+
+def gain(df: pd.DataFrame, attr_name: str, target_name: str, categorial: bool) -> float:
+    if categorial:
+        return categorial_info(df, target_name) - categorial_info_a(df, attr_name, target_name)
     return info(df, df, target_name) - info_a(df, attr_name, target_name)
 
 
-def gain_ratio(df: pd.DataFrame, attr_name: str, target_name: str) -> float:
-    return gain(df, attr_name, target_name) / split_info(df, attr_name)
+def gain_ratio(df: pd.DataFrame, attr_name: str, target_name: str, categorial: bool) -> float:
+    return gain(df, attr_name, target_name, categorial) / split_info(df, attr_name)
 
 
-def data_set_gain_ratio(df: pd.DataFrame, target_name: str, num_target_columns: int) -> pd.Series:
+def data_set_gain_ratio(df: pd.DataFrame, target_name: str, num_target_columns: int,
+                        features_is_categorial: pd.Series) -> pd.Series:
     gain_ratio_list = []
     for col_name in df.columns[0:-num_target_columns]:
-        gain_ratio_list.append(gain_ratio(df, col_name, target_name))
+        gain_ratio_list.append(gain_ratio(df, col_name, target_name, features_is_categorial[col_name]))
     return pd.Series(gain_ratio_list, index=df.columns[0:-num_target_columns])
+
+

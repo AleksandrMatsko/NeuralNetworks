@@ -1,6 +1,8 @@
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import typing
 
 
 def count_lines(df: pd.DataFrame) -> int:
@@ -82,5 +84,46 @@ def get_some_statistics(df: pd.DataFrame) -> pd.DataFrame:
         get_standard_deviation(df),
         get_power(df),
         get_interquartile_range(df)], axis=1)
+    return f.T
+
+def get_mode(df: pd.DataFrame) -> pd.Series:
+    ser = df.mode(axis=0).iloc[0]
+    ser.name = 'Мода'
+    return ser
+
+def get_percent_mode(df: pd.DataFrame, calc_mode_function: typing.Callable[[pd.DataFrame], pd.Series]) -> pd.Series:
+    modes = calc_mode_function(df).T
+    percents = dict()
+    for column_name in df.columns:
+        percents[column_name] = count_lines(df[df[column_name] == modes[column_name]]) / count_lines(df) * 100
+    return pd.Series(percents).rename('Процент_моды')
+
+def get_second_mode(df: pd.DataFrame) -> pd.Series:
+    modes = get_mode(df).T
+    no_modes_list = list()
+    for column_name in df.columns:
+        ser = df[df[column_name] != modes[column_name]][column_name]
+        ser.name = column_name
+        no_modes_list.append(ser)
+
+    modes = list()
+    for i in range(len(df.columns)):
+        mode_dict = no_modes_list[i].mode().to_dict()
+        try:
+            modes.append(mode_dict[0])
+        except KeyError:
+            modes.append(np.nan)
+    return pd.Series(data=modes, index=df.columns).rename('Вторая_мода')
+
+def get_some_statistics_categorial(df: pd.DataFrame) -> pd.DataFrame:
+    f = pd.concat([
+        count_non_nulls(df),
+        count_percent_nulls(df),
+        get_power(df),
+        get_mode(df),
+        get_percent_mode(df, get_mode),
+        get_second_mode(df),
+        get_percent_mode(df, get_second_mode)
+    ], axis=1)
     return f.T
 

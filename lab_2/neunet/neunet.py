@@ -148,6 +148,8 @@ class NeuralNet:
         mae_values = []
         start_time = time.time()
         for epoch in range(num_epochs):
+            if epoch != 0 and epoch % 100 == 0:
+                print(f'epoch {epoch} E_n = {e_n_values[-1]}')
             df = df.sample(n=len(df.index)).reset_index(drop=True)
             for label, row in df.iterrows():
                 params = row[:-self.__NUM_TARGETS]
@@ -248,6 +250,8 @@ class NeuralNet:
             mse_values.append(mse)
             mae_values.append(mae)
 
+        print(f'\ntest:\nMSE = {mse}\nMAE = {mae}\nR^2 = {1 - mse * counter * 2 / sum_deviations_expected}\n')
+
         it = np.arange(0, len(df.index), 1)
         fig, axs = plt.subplots(1, 4)
         plt.title('test', fontsize=15)
@@ -264,8 +268,6 @@ class NeuralNet:
         axs[3].grid(True)
         axs[3].set_title(label='MAE', fontsize=10)
         plt.show()
-
-        print(f'\ntest:\nMSE = {mse}\nMAE = {mae}\nR^2 = {1 - mse * counter * 2 / sum_deviations_expected}')
 
     def predict(self, params: pd.Series):
         params = (params - self.__mean[:len(params)]) / self.__std[:len(params)]
