@@ -1,12 +1,11 @@
 import random
 import sys
-import typing
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
 from neunet.neunet import NeuralNet
-from ds_handle import split_dataset
+from preparations.ds_handle import split_dataset
 from analysis.regression_error_analyser import RegressionErrorAnalyser
 
 LEARNING_RATE = 0.0005
@@ -38,14 +37,14 @@ def main():
                        ['me'] * (hidden_2 // 1),
                    ])
     #"""
-    expected_gained_learn = nn.learn(learn, 400)
+    expected_gained_learn = nn.learn(learn, 400, categorical=False)
     learn_analysis = RegressionErrorAnalyser(expected_gained=expected_gained_learn)
     show_plots_regression(learn_analysis, learn, num_targets, "learn")
 
-    expected_gained_test = nn.test(test)
+    expected_gained_test = nn.test(test, categorical=False, need_replacement=False)
     test_analysis = RegressionErrorAnalyser(expected_gained=expected_gained_test)
     show_plots_regression(test_analysis, nn.get_normalized_df(test), num_targets, "test")
-    nn.save_weights('weights')
+    nn.save_weights('regression_weights')
     print(nn.predict(df.iloc[random.randint(0, len(df.index))][:-num_targets]))
 
 
@@ -59,7 +58,7 @@ def show_plots_regression(analyser: RegressionErrorAnalyser, df: pd.DataFrame, n
 
     it = np.arange(0, len(mse_values), 1)
     fig, axs = plt.subplots(1, 4)
-    plt.title('test', fontsize=15)
+    plt.title(msg, fontsize=15)
     axs[0].plot(it, np.array(mse_values), label='MSE')
     axs[0].grid(True)
     axs[0].set_title(label='MSE', fontsize=10)

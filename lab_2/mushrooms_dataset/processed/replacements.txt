@@ -1,8 +1,4 @@
 {
-   "is-poisonus": {
-      "p": 0,
-      "e": 1
-   },
    "cap-shape": {
       "x": 0,
       "b": 1,
@@ -79,7 +75,7 @@
       "c": 1,
       "b": 2,
       "r": 3,
-      "?": NaN
+      "?": null
    },
    "stalk-surface-above-ring": {
       "s": 0,
@@ -114,9 +110,6 @@
       "y": 6,
       "o": 7,
       "c": 8
-   },
-   "veil-type": {
-      "p": 0
    },
    "veil-color": {
       "w": 0,
@@ -163,5 +156,9 @@
       "p": 4,
       "w": 5,
       "l": 6
+   },
+   "is-poisonus": {
+      "p": 0,
+      "e": 1
    }
 }

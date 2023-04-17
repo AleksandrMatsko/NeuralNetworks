@@ -17,8 +17,8 @@ def convert_characters_to_nums(df: pd.DataFrame, columns: typing.List[str],
         col_nums_to_characters = dict()
         for i in range(len(unq_vals)):
             if unq_vals[i] == nan_sym:
-                col_characters_to_nums[nan_sym] = np.nan
-                col_nums_to_characters[np.nan] = nan_sym
+                col_characters_to_nums[nan_sym] = None
+                col_nums_to_characters[None] = nan_sym
             else:
                 col_characters_to_nums[unq_vals[i]] = i
                 col_nums_to_characters[i] = unq_vals[i]
@@ -37,7 +37,7 @@ def convert_vals_with_rule(df: pd.DataFrame, columns: typing.List[str], replace_
             raise ValueError(f"No rule for column {col_name}, got {type(value_dict)} excepted dict")
         unq_vals = list(df[col_name].unique())
         for unq_val in unq_vals:
-            if value_dict.get(unq_val) is None and not np.isnan(unq_val):
+            if value_dict.get(unq_val) is None and (not np.isnan(unq_val) or unq_val is None):
                 raise ValueError(f"No rule for value {unq_val} in column {col_name}")
         new_df[col_name] = new_df[col_name].apply(lambda x: value_dict.get(x))
     return new_df

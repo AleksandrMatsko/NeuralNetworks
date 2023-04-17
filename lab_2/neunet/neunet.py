@@ -1,13 +1,12 @@
 import json
-import math
 import os.path
 import time
 import typing as ty
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 from neunet.layer import Layer
+import preparations.converter as cnvt
 
 
 class NeuralNet:
@@ -25,6 +24,10 @@ class NeuralNet:
     __mean: ty.Optional[pd.Series]
     __std: ty.Optional[pd.Series]
 
+    # for replacement
+    __characters_to_nums: ty.Optional[dict]
+    __nums_to_characters: ty.Optional[dict]
+
     def __init_constants(self, learn_rate: float, num_targets: int, precision: float, start_weight_mul: float):
         self.__weight_matrices = []
         self.__learning_rate = learn_rate
@@ -35,6 +38,8 @@ class NeuralNet:
         self.__START_WEIGHT_MULTIPLIER = start_weight_mul
 
     def __unpack_from_dir(self, dir_name: str):
+        if not os.path.exists(dir_name):
+            raise FileNotFoundError(f"directory {dir_name} not found")
         dir_content = os.listdir(dir_name)
         dir_content.sort()
         self.__weight_matrices = []
@@ -43,8 +48,11 @@ class NeuralNet:
             if os.path.isfile(file_path) and file_name.endswith('.csv'):
                 self.__weight_matrices.append(np.loadtxt(file_path, delimiter=','))
         self.__dims = []
-        for matrix in self.__weight_matrices:
-            self.__dims.append(np.shape(matrix))
+        for i in range(len(self.__weight_matrices)):
+            shape = np.shape(self.__weight_matrices[i])
+            if len(shape) != 2:
+                self.__weight_matrices[i] = self.__weight_matrices[i].reshape(1, shape[0])
+            self.__dims.append(np.shape(self.__weight_matrices[i]))
         fp = open(os.path.join(dir_name, 'params.txt'), 'r')
         params = json.load(fp)
         self.__std = pd.Series(params['std'])
@@ -54,6 +62,8 @@ class NeuralNet:
             self.__layers.append(Layer(len(func_list), func_list))
         self.__DERIVATIVE_PRECISION = params['precision']
         self.__NUM_TARGETS = len(self.__layers[-1])
+        self.__characters_to_nums = params["chrs_to_nums"]
+        self.__nums_to_characters = params["nums_to_chrs"]
         print(self.__dims)
 
     def __init__(self, in_num, hidden_num: ty.List[int], out_num: int, dir_name: str = None, learn_rate: float = 0.001,
@@ -103,13 +113,17 @@ class NeuralNet:
 
     def save_weights(self, dir_name: str):
         print('saving weights...')
+        if not os.path.exists(dir_name):
+            os.mkdir(dir_name)
         for i in range(len(self.__weight_matrices)):
             np.savetxt(os.path.join(dir_name, 'weight_' + str(i) + '.csv'), self.__weight_matrices[i], delimiter=',')
         params = {
-            "mean": self.__mean.to_dict(),
-            "std": self.__std.to_dict(),
+            "mean": self.__mean.to_dict() if self.__mean is not None else None,
+            "std": self.__std.to_dict() if self.__std is not None else None,
             "precision": self.__DERIVATIVE_PRECISION,
-            "act_funcs": [layer.get_act_funcs() for layer in self.__layers]
+            "act_funcs": [layer.get_act_funcs() for layer in self.__layers],
+            "chrs_to_nums": self.__characters_to_nums if self.__characters_to_nums is not None else None,
+            "nums_to_chrs": self.__nums_to_characters if self.__nums_to_characters is not None else None
         }
         open(os.path.join(dir_name, 'params.txt'), 'w').write(json.dumps(params, sort_keys=False, indent=3))
 
@@ -124,32 +138,23 @@ class NeuralNet:
             vector = self.__layers[i + 1].get_outputs()
         return vector
 
-    def __calc_e_n(self, expected, vector):
-        error = []
-        for d, y in zip(expected, vector):
-            if np.isnan(d):
-                error.append(np.nan)
-            else:
-                error.append(d - y)
-        error = np.array(error)
-        e_n = np.nansum(np.multiply(error, error))
-        e_n /= 2
-        return e_n, error
-
-    def learn(self, df: pd.DataFrame, num_epochs: int, retrain: bool = False):
+    def learn(self, df: pd.DataFrame, num_epochs: int, categorical: bool, chars_to_nums: dict = None,
+              nums_to_chars: dict = None,  retrain: bool = False):
         if not retrain:
             self.__fill_random_weight_matrices()
-        df = self.__normalize(df)
-        counter = 0
-        mse = 0
-        mae = 0
-        e_n_values = []
-        mse_values = []
-        mae_values = []
+        if categorical and chars_to_nums is None and nums_to_chars is None:
+            df, self.__characters_to_nums, self.__nums_to_characters = cnvt.convert_characters_to_nums(df, df.columns)
+            df[df.columns] = df[df.columns].astype(float)
+        elif not categorical:
+            df = self.__normalize(df)
+        elif categorical and chars_to_nums is not None and nums_to_chars is not None:
+            self.__characters_to_nums = chars_to_nums
+            self.__nums_to_characters = nums_to_chars
+        expected_gained = []
         start_time = time.time()
         for epoch in range(num_epochs):
             if epoch != 0 and epoch % 100 == 0:
-                print(f'epoch {epoch} E_n = {e_n_values[-1]}')
+                print(f'epoch {epoch} error = {expected_gained[-1][0] - expected_gained[-1][1]}')
             df = df.sample(n=len(df.index)).reset_index(drop=True)
             for label, row in df.iterrows():
                 params = row[:-self.__NUM_TARGETS]
@@ -159,74 +164,34 @@ class NeuralNet:
                 vector = self.__forward(vector)
 
                 # calc errors
-                # print(vector)
                 expected = row[-self.__NUM_TARGETS:].to_numpy()
-                #print(f'expected:\n{expected}')
-                e_n, error = self.__calc_e_n(expected, vector)
-                #print(f'error:\n{error}')
-                mse *= counter
-                mae *= counter
-                mse += e_n
-                mae += math.sqrt(e_n)
-                counter += 1
-                mse /= counter
-                mae /= counter
-
-                e_n_values.append(e_n / len(error))
-                mse_values.append(mse)
-                mae_values.append(mae)
+                expected_gained.append((expected, vector))
+                error = expected - vector
 
                 # calc local grad for output layer
-
                 deltas = self.__layers[-1].output_delta_j(error, self.__DERIVATIVE_PRECISION)
                 deltas = deltas.reshape(1, self.__NUM_TARGETS)
-                #print(f'deltas last layer:\n{deltas}')
-                # print(f'shape deltas = {np.shape(deltas)}')
 
                 # backpropagation cycle
                 for i in range(len(self.__weight_matrices) - 1, -1, -1):
                     vector = self.__layers[i].get_outputs()
                     vector = vector.reshape(len(vector), 1)
-                    # print(f'shape vector {np.shape(vector)}')
                     weight_correction = np.nan_to_num(vector.dot(deltas).transpose()) * self.__learning_rate
-                    # print(f'weight_correction[{i}]:\n{weight_correction}\n===============================')
                     if i != 0:
                         deltas = np.multiply(self.__layers[i].derivatives(self.__DERIVATIVE_PRECISION),
                                              deltas.dot(self.__weight_matrices[i]))
-                    #print(f'deltas layer[{i}]:\n{deltas}')
                     self.__weight_matrices[i] = self.__weight_matrices[i] + weight_correction
-                    #print(f'weight_matrix[{i}]:\n{self.__weight_matrices[i]}')
-                    # print(f'shape deltas = {np.shape(deltas)}')
 
         print(f'learn time: {time.time() - start_time}')
-        it = np.arange(0, len(df.index) * num_epochs, 1)
-        fig, axs = plt.subplots(1, 4)
-        plt.title('learn', fontsize=15)
-        axs[0].plot(it, np.array(mse_values), label='MSE')
-        axs[0].grid(True)
-        axs[0].set_title(label='MSE', fontsize=10)
-        axs[1].plot(it, np.array(e_n_values), label='E_n')
-        axs[1].grid(True)
-        axs[1].set_title(label='E_n', fontsize=10)
-        axs[2].plot(it, np.array([math.sqrt(e) for e in mse_values]), label='RMSE')
-        axs[2].grid(True)
-        axs[2].set_title(label='RMSE', fontsize=10)
-        axs[3].plot(it, np.array(mae_values), label='MAE')
-        axs[3].grid(True)
-        axs[3].set_title(label='MAE', fontsize=10)
-        plt.show()
+        return expected_gained
 
-        print(f'\nlearn\nMSE = {mse}\nMAE = {mae}\n')
-
-    def test(self, df: pd.DataFrame):
-        df = self.__normalize(df)
-        counter = 0
-        mse = 0
-        mae = 0
-        e_n_values = []
-        mse_values = []
-        mae_values = []
-        sum_deviations_expected = 0
+    def test(self, df: pd.DataFrame, categorical: bool, need_replacement: bool):
+        if categorical and need_replacement:
+            df, self.__characters_to_nums, self.__nums_to_characters = cnvt.convert_characters_to_nums(df, df.columns)
+            df[df.columns] = df[df.columns].astype(float)
+        elif not categorical:
+            df = self.__normalize(df)
+        expected_gained = []
         for label, row in df.iterrows():
             params = row[:-self.__NUM_TARGETS]
 
@@ -234,42 +199,14 @@ class NeuralNet:
             vector = self.__forward(vector)
 
             expected = row[-self.__NUM_TARGETS:].to_numpy()
-            e_n, error = self.__calc_e_n(expected, vector)
-            mse *= counter
-            mae *= counter
-            mse += e_n
-            print(f'E_n = {e_n}\n{self.__denormalize(row)}')
-            mae += math.sqrt(e_n)
-            deviation_expected = expected - df.mean(skipna=True)[-self.__NUM_TARGETS:].to_numpy()\
-                .reshape(self.__NUM_TARGETS, 1)
-            sum_deviations_expected += np.nansum(np.multiply(deviation_expected, deviation_expected))
-            counter += 1
-            mse /= counter
-            mae /= counter
-            e_n_values.append(e_n / len(error))
-            mse_values.append(mse)
-            mae_values.append(mae)
-
-        print(f'\ntest:\nMSE = {mse}\nMAE = {mae}\nR^2 = {1 - mse * counter * 2 / sum_deviations_expected}\n')
-
-        it = np.arange(0, len(df.index), 1)
-        fig, axs = plt.subplots(1, 4)
-        plt.title('test', fontsize=15)
-        axs[0].plot(it, np.array(mse_values), label='MSE')
-        axs[0].grid(True)
-        axs[0].set_title(label='MSE', fontsize=10)
-        axs[1].plot(it, np.array(e_n_values), label='E_n')
-        axs[1].grid(True)
-        axs[1].set_title(label='E_n', fontsize=10)
-        axs[2].plot(it, np.array([math.sqrt(e) for e in mse_values]), label='RMSE')
-        axs[2].grid(True)
-        axs[2].set_title(label='RMSE', fontsize=10)
-        axs[3].plot(it, np.array(mae_values), label='MAE')
-        axs[3].grid(True)
-        axs[3].set_title(label='MAE', fontsize=10)
-        plt.show()
+            expected_gained.append((expected, vector))
+        return expected_gained
 
     def predict(self, params: pd.Series):
         params = (params - self.__mean[:len(params)]) / self.__std[:len(params)]
         res = self.__forward(params)
         return res * self.__std[-self.__NUM_TARGETS:] + self.__mean[-self.__NUM_TARGETS:]
+
+    def get_normalized_df(self, df: pd.DataFrame):
+        new_df = df.copy(deep=True)
+        return self.__normalize(new_df)
