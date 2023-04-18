@@ -39,7 +39,7 @@ def main():
                        ['sigmoid'] * (hidden_1 // 1),
                        ['sigmoid'] * (hidden_2 // 1),
                    ])
-    expected_gained_learn = nn.learn(learn, 2, categorical=True, chars_to_nums=chars_to_nums,
+    expected_gained_learn = nn.learn(learn, num_epochs=10, categorical=True, chars_to_nums=chars_to_nums,
                                      nums_to_chars=nums_to_chars)
     learn_analyser = ClassificationErrorAnalyser(expected_gained_learn)
     show_plots_classification(learn_analyser, "learn")
@@ -58,8 +58,11 @@ def show_plots_classification(analyser: ClassificationErrorAnalyser, msg: str):
     accuracy = analyser.accuracy()
     f_score = analyser.f_score()
 
-    print(f"\n{msg}\n recall = {recall[-1]}\n precision = {precision[-1]}\n accuracy = {accuracy[-1]}\n "
-          f"F-score = {f_score[-1]}\n")
+    border = 0.5
+    ind = analyser.get_index_by_border(border)
+
+    print(f"\n{msg}\n border = {border}\n recall = {recall[ind]}\n precision = {precision[ind]}\n "
+          f"accuracy = {accuracy[ind]}\n F-score = {f_score[ind]}\n")
 
     tpr = analyser.tpr()
     fpr = analyser.fpr()
