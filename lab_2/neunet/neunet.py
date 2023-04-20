@@ -55,8 +55,8 @@ class NeuralNet:
             self.__dims.append(np.shape(self.__weight_matrices[i]))
         fp = open(os.path.join(dir_name, 'params.txt'), 'r')
         params = json.load(fp)
-        self.__std = pd.Series(params['std'])
-        self.__mean = pd.Series(params['mean'])
+        self.__std = pd.Series(params['std'], dtype=float)
+        self.__mean = pd.Series(params['mean'], dtype=float)
         self.__layers = []
         for func_list in params['act_funcs']:
             self.__layers.append(Layer(len(func_list), func_list))

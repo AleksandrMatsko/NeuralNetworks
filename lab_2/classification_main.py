@@ -39,7 +39,7 @@ def main():
                        ['sigmoid'] * (hidden_1 // 1),
                        ['sigmoid'] * (hidden_2 // 1),
                    ])
-    expected_gained_learn = nn.learn(learn, num_epochs=10, categorical=True, chars_to_nums=chars_to_nums,
+    expected_gained_learn = nn.learn(learn, num_epochs=20, categorical=True, chars_to_nums=chars_to_nums,
                                      nums_to_chars=nums_to_chars)
     learn_analyser = ClassificationErrorAnalyser(expected_gained_learn)
     show_plots_classification(learn_analyser, "learn")

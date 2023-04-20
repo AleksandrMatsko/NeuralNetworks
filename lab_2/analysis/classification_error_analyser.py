@@ -60,7 +60,6 @@ class ClassificationErrorAnalyser:
                  border_step: float = 0.05) -> None:
         self.__expected_gained = expected_gained
         self.__BORDERS = np.arange(0, 1.2, border_step).tolist()
-        print(f"borders:\n {self.__BORDERS}")
         self.__calc_params()
 
     def precision(self) -> np.array:
