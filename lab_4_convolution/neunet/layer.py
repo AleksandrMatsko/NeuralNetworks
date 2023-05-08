@@ -18,9 +18,6 @@ class DenseLayer:
     __output: np.array
     __neurons: ty.List[Neuron]
 
-    __portions_for_threads: ty.List[ty.Tuple]
-    __thread_pool: ThreadPool
-
     def __init__(self, start_weight_multiplier: float = 1, dims: ty.Tuple = None, weight_matrix: np.array = None,
                  funcs: ty.List[str] = None, deviation: float = 0.5):
         self.__START_WEIGHT_MULTIPLIER = start_weight_multiplier
@@ -42,14 +39,6 @@ class DenseLayer:
             else:
                 self.__neurons.append(Neuron())
 
-        num_threads = int(math.log2(len(self.__neurons)))
-        portions_of_neurons = [len(self.__neurons) // num_threads] * num_threads
-        portions_of_neurons[0] += len(self.__neurons) % num_threads
-        self.__portions_for_threads = [(0, portions_of_neurons[0])]
-        for i in range(1, num_threads):
-            self.__portions_for_threads.append((self.__portions_for_threads[i - 1][0] + portions_of_neurons[i - 1],
-                                                portions_of_neurons[i]))
-        self.__thread_pool = ThreadPool(processes=num_threads)
 
     def set_input(self, input_vec: np.array) -> None:
         #print(f"dense set_input: shape = {input_vec.shape}")
@@ -62,15 +51,6 @@ class DenseLayer:
     def get_dims(self):
         return self.__dims
 
-    @staticmethod
-    def __activate_for_thread(tup: tuple, after_weights: np.array, neurons: ty.List[Neuron]) -> list:
-        res = []
-        for i in range(tup[0], tup[0] + tup[1]):
-            neurons[i].set_input(after_weights[i])
-            neurons[i].activate()
-            res.append(neurons[i].get_output())
-        return res
-
     def activate(self) -> None:
         if self.__input is None:
             raise ValueError("input is not set")
@@ -78,11 +58,10 @@ class DenseLayer:
         after_weights = after_weights.reshape(len(after_weights))
 
         out = []
-        arg = []
-        for i in range(len(self.__portions_for_threads)):
-            arg.append((self.__portions_for_threads[i], after_weights, self.__neurons))
-        for res in self.__thread_pool.starmap(self.__activate_for_thread, arg):
-            out += res
+        for i in range(len(after_weights)):
+            self.__neurons[i].set_input(after_weights[i])
+            self.__neurons[i].activate()
+            out.append(self.__neurons[i].get_output())
         self.__output = np.array(out)
 
     def get_output(self) -> np.array:
@@ -93,21 +72,8 @@ class DenseLayer:
     def get_act_funcs(self) -> ty.List[str]:
         return [n.get_act_func() for n in self.__neurons]
 
-    @staticmethod
-    def __derivative_for_thread(tup: tuple, precision: float, neurons: ty.List[Neuron]) -> list:
-        res = []
-        for i in range(tup[0], tup[0] + tup[1]):
-            res.append(neurons[i].derivative_from_input(precision))
-        return res
-
     def calc_derivatives(self, precision: float) -> np.array:
-        out = []
-        arg = []
-        for i in range(len(self.__portions_for_threads)):
-            arg.append((self.__portions_for_threads[i], precision, self.__neurons))
-        for res in self.__thread_pool.starmap(self.__derivative_for_thread, arg):
-            out += res
-        return np.array(out)
+        return np.array([n.derivative_from_input(precision) for n in self.__neurons])
 
     def prepare_for_deltas(self, deltas: np.array, learning_rate: float) -> ty.Tuple[np.array, bool]:
         weight_correction = np.nan_to_num(self.__input.reshape(len(self.__input), 1).dot(deltas).transpose()) \
