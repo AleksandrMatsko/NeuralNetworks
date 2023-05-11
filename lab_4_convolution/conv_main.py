@@ -67,7 +67,7 @@ def main():
         DenseLayer(dims=(hidden_2, hidden_1), funcs=["sigmoid"] * hidden_2, deviation=0.5),
         DenseLayer(dims=(10, hidden_2), funcs=["sigmoid"], deviation=0.5)
     ])
-    expected_gained_learn = nn.learn(learn.head(2), num_epochs=1, categorical=True, need_preparations=False)
+    expected_gained_learn = nn.learn(learn.head(10), num_epochs=1, categorical=True, need_preparations=False)
     learn_analyser = ClassificationErrorAnalyser(expected_gained_learn, 10)
     show_plots_classification(learn_analyser, "learn")
     #"""
@@ -81,10 +81,10 @@ def main():
 
 
 def show_plots_classification(analyser: ClassificationErrorAnalyser, msg: str):
-    recall = analyser.recall()
-    precision = analyser.precision()
-    accuracy = analyser.accuracy()
-    f_score = analyser.f_score()
+    recall = np.average(analyser.recall(), axis=1)
+    precision = np.average(analyser.precision(), axis=1)
+    accuracy = np.average(analyser.accuracy(), axis=1)
+    f_score = np.average(analyser.f_score(), axis=1)
 
     border = 0.5
     ind = analyser.get_index_by_border(border)
@@ -96,8 +96,22 @@ def show_plots_classification(analyser: ClassificationErrorAnalyser, msg: str):
     fpr = analyser.fpr()
     fnr = analyser.fnr()
 
+    for i in range(tpr.shape[1]):
+        fig, axs = plt.subplots(1, 2)
+        fig.suptitle('is_' + str(i), fontsize=15)
+        axs[0].plot(fpr[:, i], fpr[:, i], fpr[:, i], tpr[:, i])
+        axs[0].grid(True)
+        axs[0].set_title(label='ROC', fontsize=10)
+        axs[1].plot(fpr[:, i], fpr[:, i], fpr[:, i], fnr[:, i])
+        axs[1].grid(True)
+        axs[1].set_title(label='DET', fontsize=10)
+        plt.show()
+
+    tpr = np.average(tpr, axis=1)
+    fpr = np.average(fpr, axis=1)
+    fnr = np.average(fnr, axis=1)
     fig, axs = plt.subplots(1, 2)
-    plt.title('test', fontsize=15)
+    fig.suptitle('average', fontsize=15)
     axs[0].plot(fpr, fpr, fpr, tpr)
     axs[0].grid(True)
     axs[0].set_title(label='ROC', fontsize=10)
