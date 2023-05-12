@@ -115,17 +115,17 @@ class ClassificationErrorAnalyser:
         num_cols = self.__NUM_TARGETS
         total = num_cols * num_rows
         precisions = np.divide(self.__TP.reshape(total), self.__TP.reshape(total) + self.__FP.reshape(total))
-        return np.average(precisions.reshape((num_rows, num_cols)), axis=1)
+        return precisions.reshape((num_rows, num_cols))
 
     def recall(self) -> np.array:
         num_rows = len(self.__BORDERS)
         num_cols = self.__NUM_TARGETS
         total = num_cols * num_rows
         recalls = np.divide(self.__TP.reshape(total), self.__TP.reshape(total) + self.__FN.reshape(total))
-        return np.average(recalls.reshape((num_rows, num_cols)), axis=1)
+        return recalls.reshape((num_rows, num_cols))
 
     def accuracy(self) -> np.array:
-        return np.average((self.__TP + self.__TN) / len(self.__expected_gained), axis=1)
+        return (self.__TP + self.__TN) / len(self.__expected_gained)
 
     def tpr(self) -> np.array:
         return self.recall()
@@ -135,14 +135,14 @@ class ClassificationErrorAnalyser:
         num_cols = self.__NUM_TARGETS
         total = num_cols * num_rows
         fprs = np.divide(self.__FP.reshape(total), self.__FP.reshape(total) + self.__TN.reshape(total))
-        return np.average(fprs.reshape((num_rows, num_cols)), axis=1)
+        return fprs.reshape((num_rows, num_cols))
 
     def fnr(self) -> np.array:
         num_rows = len(self.__BORDERS)
         num_cols = self.__NUM_TARGETS
         total = num_cols * num_rows
         fnrs = np.divide(self.__FN.reshape(total), self.__FN.reshape(total) + self.__FP.reshape(total))
-        return np.average(fnrs.reshape((num_rows, num_cols)), axis=1)
+        return fnrs.reshape((num_rows, num_cols))
 
     def f_score(self) -> np.array:
         precision = self.precision()
